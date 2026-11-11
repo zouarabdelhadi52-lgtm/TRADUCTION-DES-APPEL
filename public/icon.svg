@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="phoneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded squircle with safe padding for maskable -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" />
+
+  <!-- Outer Ring glow -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#1e293b" stroke-width="8" />
+
+  <!-- Center Circle Shield -->
+  <circle cx="256" cy="256" r="160" fill="#1e293b" fill-opacity="0.6" stroke="#334155" stroke-width="4" />
+
+  <!-- Phone receiver icon in center -->
+  <g transform="translate(146, 146) scale(0.43)">
+    <!-- Phone handset path -->
+    <path fill="url(#phoneGrad)" d="M500.5 390.8l-87.7-87.7c-17.7-17.7-46.3-17.7-64 0l-45.3 45.3c-70.3-34.9-127.4-92-162.3-162.3l45.3-45.3c17.7-17.7 17.7-46.3 0-64L98.8 11.5C81.1-6.2 52.5-6.2 34.8 11.5L9.5 36.8C-19.8 66.1 11.7 149.7 75.3 234.3c58.2 77.4 144.1 163.3 221.5 221.5 84.6 63.6 168.2 95.1 197.5 65.8l25.3-25.3c17.7-17.7 17.7-46.3 0-64z"/>
+  </g>
+
+  <!-- Soundwaves / Translation exchange curves -->
+  <path d="M290 190 A 60 60 0 0 1 290 322" fill="none" stroke="url(#waveGrad)" stroke-width="14" stroke-linecap="round" />
+  <path d="M330 160 A 110 110 0 0 1 330 352" fill="none" stroke="url(#waveGrad)" stroke-width="12" stroke-linecap="round" opacity="0.8" />
+  <path d="M370 130 A 160 160 0 0 1 370 382" fill="none" stroke="url(#waveGrad)" stroke-width="10" stroke-linecap="round" opacity="0.5" />
+
+  <!-- Small translation indicator dot -->
+  <circle cx="256" cy="110" r="10" fill="#10b981" />
+</svg>

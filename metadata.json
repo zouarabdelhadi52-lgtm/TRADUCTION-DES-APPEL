@@ -1,0 +1,6 @@
+{
+  "name": "VoxCall Translate - Traducteur Téléphonique Vocal en Temps Réel",
+  "description": "Application intelligente de traduction vocale des appels téléphoniques en temps réel, multilingue avec synthèse audio instantanée et historique des conversations enregistrées.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
