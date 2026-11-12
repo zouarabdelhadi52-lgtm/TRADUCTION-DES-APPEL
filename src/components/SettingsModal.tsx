@@ -1,7 +1,8 @@
 import React from 'react';
-import { Volume2, Sliders, Sparkles, Check, Play, Bell } from 'lucide-react';
+import { Volume2, Sliders, Sparkles, Check, Play, Bell, ArrowRightLeft } from 'lucide-react';
 import { AudioSettings } from '../types';
 import { speakTranslatedText } from '../utils/audioTelephony';
+import { SpeakerphoneGuide } from './SpeakerphoneGuide';
 
 interface SettingsModalProps {
   settings: AudioSettings;
@@ -63,6 +64,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   type="checkbox"
                   checked={settings.autoSpeak}
                   onChange={(e) => handleChange('autoSpeak', e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+
+            {/* Auto switch turn toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+                  <span>Bascule Automatique vers l'Interlocuteur</span>
+                </div>
+                <div className="text-xs text-slate-400">
+                  Alterne automatiquement l'écoute et la prise de parole après chaque réplique traduite.
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.autoSwitchTurn ?? true}
+                  onChange={(e) => handleChange('autoSwitchTurn', e.target.checked)}
                   className="sr-only peer"
                 />
                 <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
@@ -177,6 +200,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Loudspeaker Instructions Guide */}
+        <SpeakerphoneGuide inline={true} />
       </div>
     </div>
   );

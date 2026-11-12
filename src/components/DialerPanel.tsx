@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Phone, Delete, Globe, User, Sparkles, Clock, ArrowRight } from 'lucide-react';
+import { Phone, Delete, Globe, User, Sparkles, Clock, ArrowRight, Volume2 } from 'lucide-react';
 import { SUPPORTED_LANGUAGES, getLanguageByCode } from '../data/languages';
 import { playDtmfTone } from '../utils/audioTelephony';
+import { SpeakerphoneGuide } from './SpeakerphoneGuide';
 
 interface DialerPanelProps {
   onStartCall: (params: {
@@ -79,6 +80,7 @@ export const DialerPanel: React.FC<DialerPanelProps> = ({
   const [phoneNumber, setPhoneNumber] = useState('+212 5 22 40 50 60');
   const [contactName, setContactName] = useState('Mehdi Benjelloun');
   const [scenario, setScenario] = useState('Dédouanement & Fret Port Tanger Med');
+  const [showSpeakerModal, setShowSpeakerModal] = useState(false);
 
   const dialButtons = [
     { digit: '1', sub: '' },
@@ -257,6 +259,24 @@ export const DialerPanel: React.FC<DialerPanelProps> = ({
             <Phone className="w-5 h-5 fill-current" />
             <span>Appeler avec Traduction en Direct</span>
           </button>
+
+          {/* Speakerphone Notice Card */}
+          <div className="mt-3.5 p-3 rounded-xl bg-amber-950/30 border border-amber-800/60 flex items-start gap-2.5 text-xs text-amber-200/90">
+            <Volume2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-semibold text-amber-100">Consigne Haut-Parleur :</span>
+              <span className="ml-1 text-[11px] text-amber-200/80">
+                Pensez à activer le haut-parleur de votre appel pour que VoxCall capte les deux interlocuteurs.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSpeakerModal(true)}
+                className="mt-1 block text-[11px] font-semibold text-amber-400 hover:text-white underline underline-offset-2"
+              >
+                Lire la consigne détaillée ➔
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Fast Contacts & Scenarios */}
@@ -361,6 +381,13 @@ export const DialerPanel: React.FC<DialerPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {showSpeakerModal && (
+        <SpeakerphoneGuide
+          isOpen={showSpeakerModal}
+          onClose={() => setShowSpeakerModal(false)}
+        />
+      )}
     </div>
   );
 };

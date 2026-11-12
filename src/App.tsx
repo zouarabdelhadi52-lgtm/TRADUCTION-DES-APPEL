@@ -9,9 +9,12 @@ import { CallHistoryView } from './components/CallHistoryView';
 import { SettingsModal } from './components/SettingsModal';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { IncomingCallDetector } from './components/IncomingCallDetector';
+import { SpeakerphoneGuide } from './components/SpeakerphoneGuide';
+import { AndroidInstallModal } from './components/AndroidInstallModal';
 
 const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
   autoSpeak: true,
+  autoSwitchTurn: true,
   speechRate: 1.0,
   speechPitch: 1.0,
   speechVolume: 1.0,
@@ -25,6 +28,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'call' | 'intercom' | 'history' | 'settings'>('call');
   const [isInCall, setIsInCall] = useState(false);
   const [isStandbyActive, setIsStandbyActive] = useState(true); // Auto-start on call enabled by default
+  const [showSpeakerphoneGuide, setShowSpeakerphoneGuide] = useState(false);
+  const [showAndroidModal, setShowAndroidModal] = useState(false);
 
   // Language pair (Default: Français ⇄ Darija Marocaine 🇲🇦)
   const [userLang, setUserLang] = useState('fr');
@@ -164,6 +169,8 @@ export default function App() {
           setIsInCall(false);
           setActiveTab('call');
         }}
+        onOpenSpeakerphoneGuide={() => setShowSpeakerphoneGuide(true)}
+        onOpenAndroidModal={() => setShowAndroidModal(true)}
         recordingsCount={calls.length}
       />
 
@@ -237,6 +244,22 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Global Speakerphone Guide Modal */}
+      {showSpeakerphoneGuide && (
+        <SpeakerphoneGuide
+          isOpen={showSpeakerphoneGuide}
+          onClose={() => setShowSpeakerphoneGuide(false)}
+        />
+      )}
+
+      {/* Global Android Hub & APK Modal */}
+      {showAndroidModal && (
+        <AndroidInstallModal
+          isOpen={showAndroidModal}
+          onClose={() => setShowAndroidModal(false)}
+        />
+      )}
     </div>
   );
 }

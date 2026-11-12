@@ -1,6 +1,110 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Neutralize Vite HMR WebSocket in AI Studio sandbox per runtime constraint: "HMR: Disabled. Ignore WebSocket errors."
+      (function() {
+        try {
+          var OrigWS = window.WebSocket;
+          if (OrigWS) {
+            window.WebSocket = function(url, protocols) {
+              var isHmr = protocols === 'vite-hmr' ||
+                (Array.isArray(protocols) && protocols.indexOf('vite-hmr') !== -1) ||
+                (typeof url === 'string' && (url.indexOf('vite-hmr') !== -1 || url.indexOf('@vite') !== -1));
+              if (isHmr) {
+                var listeners = {};
+                var fakeWs = {
+                  OPEN: 1,
+                  CONNECTING: 0,
+                  CLOSING: 2,
+                  CLOSED: 3,
+                  readyState: 1,
+                  bufferedAmount: 0,
+                  extensions: '',
+                  protocol: 'vite-hmr',
+                  url: String(url),
+                  binaryType: 'blob',
+                  addEventListener: function(type, cb) {
+                    if (!listeners[type]) listeners[type] = [];
+                    listeners[type].push(cb);
+                    if (type === 'open') {
+                      setTimeout(function() {
+                        try { cb({ type: 'open', target: fakeWs }); } catch (e) {}
+                      }, 0);
+                    }
+                  },
+                  removeEventListener: function(type, cb) {
+                    if (!listeners[type]) return;
+                    listeners[type] = listeners[type].filter(function(fn) { return fn !== cb; });
+                  },
+                  dispatchEvent: function(event) {
+                    var cbs = listeners[event.type] || [];
+                    cbs.forEach(function(fn) { try { fn(event); } catch (e) {} });
+                    return true;
+                  },
+                  send: function() {},
+                  close: function() { fakeWs.readyState = 3; },
+                  set onopen(fn) { fakeWs.addEventListener('open', fn); },
+                  set onclose(fn) { fakeWs.addEventListener('close', fn); },
+                  set onerror(fn) { fakeWs.addEventListener('error', fn); },
+                  set onmessage(fn) { fakeWs.addEventListener('message', fn); }
+                };
+                return fakeWs;
+              }
+              return new OrigWS(url, protocols);
+            };
+            window.WebSocket.prototype = OrigWS.prototype;
+            window.WebSocket.CONNECTING = 0;
+            window.WebSocket.OPEN = 1;
+            window.WebSocket.CLOSING = 2;
+            window.WebSocket.CLOSED = 3;
+          }
+        } catch (e) {}
+
+        var isViteWsError = function(str) {
+          if (!str) return false;
+          var s = String(str);
+          return s.includes('WebSocket') || s.includes('websocket') || s.includes('[vite]') || s.includes('@vite/client') || s.includes('closed without opened');
+        };
+
+        var origConsoleError = console.error;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            var arg = arguments[i];
+            if (arg instanceof Error && isViteWsError(arg.message || arg.stack)) return;
+            if (typeof arg === 'string' && isViteWsError(arg)) return;
+          }
+          return origConsoleError.apply(console, arguments);
+        };
+
+        var origConsoleWarn = console.warn;
+        console.warn = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            var arg = arguments[i];
+            if (arg instanceof Error && isViteWsError(arg.message || arg.stack)) return;
+            if (typeof arg === 'string' && isViteWsError(arg)) return;
+          }
+          return origConsoleWarn.apply(console, arguments);
+        };
+
+        window.addEventListener('error', function(e) {
+          if (e && (isViteWsError(e.message) || (e.error && isViteWsError(e.error.message)))) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e && (e.reason ? (e.reason.message || e.reason) : '');
+          if (isViteWsError(reason)) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>VoxCall Translate · Traduction Vocale d'Appels en Temps Réel</title>

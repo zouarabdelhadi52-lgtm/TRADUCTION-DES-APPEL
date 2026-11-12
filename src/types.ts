@@ -51,6 +51,7 @@ export interface CallRecord {
 
 export interface AudioSettings {
   autoSpeak: boolean;
+  autoSwitchTurn?: boolean; // Bascule automatique vers l'interlocuteur après chaque traduction
   speechRate: number; // 0.8 - 1.4
   speechPitch: number; // 0.8 - 1.2
   speechVolume: number; // 0 - 1

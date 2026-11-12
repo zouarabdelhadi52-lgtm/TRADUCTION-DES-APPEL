@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.voxcall.translate",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7C:F1:5C:CF:10:D7:70:1E:EB:E1:22:90:EA:A9:98:7E:99:A6:08:70:64:64:7B:64:0A:79:3F:8A:2B"
+      ]
+    }
+  }
+]

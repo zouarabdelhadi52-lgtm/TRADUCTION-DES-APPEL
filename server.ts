@@ -282,7 +282,7 @@ Consignes :
 4. Indique si une adaptation culturelle ou idiomatique a été effectuée.`;
 
       const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction: 'Tu es un système de traduction instantanée pour appels téléphoniques. Rends toujours un objet JSON valide.',
@@ -325,7 +325,7 @@ Consignes :
         phonetic: parsed.phonetic || '',
         tone: parsed.tone || 'Courtois',
         adaptationNote: parsed.adaptationNote || '',
-        engine: 'gemini-3.8-flash',
+        engine: 'gemini-2.5-flash',
       });
     } catch (error: unknown) {
       console.warn('Gemini translation latency/error, serving instant fallback:', error);
@@ -374,7 +374,7 @@ ${conversationText}
 Génère une synthèse exécutive pour le carnet d'appels.`;
 
       const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           systemInstruction: 'Tu es un assistant exécutif qui analyse les enregistrements d\'appels téléphoniques. Réponds au format JSON.',
@@ -476,7 +476,7 @@ Réponds comme au téléphone : de façon naturelle, concise (1 à 2 phrases ora
 Fournis ta réponse dans ta langue native (${contactLanguage}), ainsi que la traduction en français pour l'utilisateur.`;
 
       const geminiPromise = ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -564,11 +564,16 @@ Fournis ta réponse dans ta langue native (${contactLanguage}), ainsi que la tra
 // Vite middleware in dev or static files in production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+  const http = await import('http');
+  const httpServer = http.createServer(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -580,7 +585,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`VoxCall Translate server running on port ${PORT} (NODE_ENV=${process.env.NODE_ENV || 'development'})`);
   });
 }

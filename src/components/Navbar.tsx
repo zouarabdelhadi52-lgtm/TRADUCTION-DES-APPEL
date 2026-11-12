@@ -1,11 +1,13 @@
 import React from 'react';
-import { Phone, Radio, History, Settings, PhoneCall } from 'lucide-react';
+import { Phone, Radio, History, Settings, PhoneCall, Volume2, Smartphone } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: 'call' | 'intercom' | 'history' | 'settings';
   setActiveTab: (tab: 'call' | 'intercom' | 'history' | 'settings') => void;
   isInCall: boolean;
   onOpenDialer: () => void;
+  onOpenSpeakerphoneGuide?: () => void;
+  onOpenAndroidModal?: () => void;
   recordingsCount: number;
 }
 
@@ -14,6 +16,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   isInCall,
   onOpenDialer,
+  onOpenSpeakerphoneGuide,
+  onOpenAndroidModal,
   recordingsCount,
 }) => {
   return (
@@ -88,8 +92,30 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Zone 3: Actions */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {onOpenAndroidModal && (
+            <button
+              onClick={onOpenAndroidModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-700/80 rounded-lg transition-colors"
+              title="Installer la version Android"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Version Android</span>
+            </button>
+          )}
+
+          {onOpenSpeakerphoneGuide && (
+            <button
+              onClick={onOpenSpeakerphoneGuide}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-amber-950/60 hover:bg-amber-900/60 border border-amber-800/80 rounded-lg transition-colors"
+              title="Consigne pour le haut-parleur"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Consigne Haut-Parleur</span>
+            </button>
+          )}
+
           {isInCall ? (
             <button
               onClick={() => setActiveTab('call')}
@@ -104,7 +130,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 shadow-sm transition-colors whitespace-nowrap shrink-0"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>Lancer un Appel</span>
+              <span className="hidden sm:inline">Lancer un Appel</span>
+              <span className="sm:hidden">Appeler</span>
             </button>
           )}
         </div>

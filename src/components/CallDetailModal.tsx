@@ -14,8 +14,10 @@ import {
   Clock,
   Phone,
   Trash2,
+  Square,
+  RotateCcw,
 } from 'lucide-react';
-import { CallRecord, CallSummary, AudioSettings } from '../types';
+import { CallRecord, CallSummary, AudioSettings, TranscriptTurn } from '../types';
 import { getLanguageByCode } from '../data/languages';
 import { speakTranslatedText, stopSpeaking } from '../utils/audioTelephony';
 import { generateCallSummary } from '../utils/api';
@@ -41,6 +43,10 @@ export const CallDetailModal: React.FC<CallDetailModalProps> = ({
   const [isRegeneratingSummary, setIsRegeneratingSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<'transcript' | 'summary'>('transcript');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [playingTurnState, setPlayingTurnState] = useState<{
+    turnId: string;
+    type: 'original' | 'translated';
+  } | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const simulationIntervalRef = useRef<number | null>(null);
@@ -56,6 +62,34 @@ export const CallDetailModal: React.FC<CallDetailModalProps> = ({
       }
     };
   }, []);
+
+  const handleReplayTurnPhrase = (turn: TranscriptTurn, type: 'original' | 'translated') => {
+    if (playingTurnState?.turnId === turn.id && playingTurnState?.type === type) {
+      stopSpeaking();
+      setPlayingTurnState(null);
+      return;
+    }
+
+    stopSpeaking();
+    setPlayingTurnState({ turnId: turn.id, type });
+
+    const isUser = turn.speaker === 'user';
+    let text = '';
+    let lang = '';
+
+    if (type === 'original') {
+      text = turn.originalText;
+      lang = isUser ? userLangObj.bcp47 : contactLangObj.bcp47;
+    } else {
+      text = turn.translatedText;
+      lang = isUser ? contactLangObj.bcp47 : userLangObj.bcp47;
+    }
+
+    speakTranslatedText(text, lang, {
+      rate: playbackSpeed,
+      onEnd: () => setPlayingTurnState(null),
+    });
+  };
 
   // Format seconds to mm:ss
   const formatTime = (secs: number) => {
@@ -373,10 +407,13 @@ Traduit (${t.speaker === 'user' ? contactLangObj.name : userLangObj.name}) : ${t
 
               {call.transcript.map((t) => {
                 const isUser = t.speaker === 'user';
+                const isPlayingVO = playingTurnState?.turnId === t.id && playingTurnState?.type === 'original';
+                const isPlayingVF = playingTurnState?.turnId === t.id && playingTurnState?.type === 'translated';
+
                 return (
                   <div
                     key={t.id}
-                    className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col gap-2"
+                    className="p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 flex flex-col gap-2.5"
                   >
                     <div className="flex items-center justify-between text-xs text-slate-400">
                       <div className="flex items-center gap-2">
@@ -390,25 +427,44 @@ Traduit (${t.speaker === 'user' ? contactLangObj.name : userLangObj.name}) : ${t
                         )}
                       </div>
 
-                      <button
-                        onClick={() => {
-                          const lang = isUser ? contactLangObj.bcp47 : userLangObj.bcp47;
-                          speakTranslatedText(t.translatedText, lang);
-                        }}
-                        className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
-                        title="Écouter la traduction"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* VO Replay */}
+                        <button
+                          onClick={() => handleReplayTurnPhrase(t, 'original')}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                            isPlayingVO
+                              ? 'bg-amber-600 text-white animate-pulse'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
+                          }`}
+                          title="Réécouter la voix originale (VO)"
+                        >
+                          {isPlayingVO ? <Square className="w-3 h-3 fill-current" /> : <Volume2 className="w-3 h-3" />}
+                          <span>{isPlayingVO ? 'Stop' : 'VO'}</span>
+                        </button>
+
+                        {/* VF Replay */}
+                        <button
+                          onClick={() => handleReplayTurnPhrase(t, 'translated')}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                            isPlayingVF
+                              ? 'bg-emerald-600 text-white animate-pulse'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white'
+                          }`}
+                          title="Réécouter la traduction"
+                        >
+                          {isPlayingVF ? <Square className="w-3 h-3 fill-current" /> : <RotateCcw className="w-3 h-3" />}
+                          <span>{isPlayingVF ? 'Stop' : 'Traduction'}</span>
+                        </button>
+                      </div>
                     </div>
 
                     {/* Original */}
                     <div className="text-sm text-slate-200">{t.originalText}</div>
 
                     {/* Translation */}
-                    <div className="pt-2 border-t border-slate-800 text-xs text-blue-300 font-medium flex flex-col gap-0.5">
+                    <div className="pt-2 border-t border-slate-800/80 text-xs text-blue-300 font-medium flex flex-col gap-0.5">
                       <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                        Traduction :
+                        Traduction ({isUser ? contactLangObj.name : userLangObj.name}) :
                       </span>
                       <span>{t.translatedText}</span>
                       {t.phonetic && (

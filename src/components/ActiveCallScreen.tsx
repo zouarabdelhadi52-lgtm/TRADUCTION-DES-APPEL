@@ -12,10 +12,17 @@ import {
   Copy,
   Check,
   Disc,
+  ArrowRightLeft,
+  Square,
+  HelpCircle,
+  Headphones,
+  RotateCcw,
+  Sparkle,
 } from 'lucide-react';
 import { TranscriptTurn, CallRecord, AudioSettings } from '../types';
 import { getLanguageByCode } from '../data/languages';
 import { AudioVisualizer } from './AudioVisualizer';
+import { SpeakerphoneGuide } from './SpeakerphoneGuide';
 import {
   playCallConnectedTone,
   playCallEndedTone,
@@ -55,6 +62,20 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isContactSpeaking, setIsContactSpeaking] = useState(false);
 
+  // Turn management & Auto-switch
+  const [currentTurn, setCurrentTurn] = useState<'user' | 'contact'>('user');
+  const [autoSwitchTurn, setAutoSwitchTurn] = useState(audioSettings.autoSwitchTurn ?? true);
+
+  // Replay state
+  const [playingState, setPlayingState] = useState<{
+    turnId: string;
+    type: 'original' | 'translated';
+  } | null>(null);
+
+  // Speakerphone guide modal & banner
+  const [showSpeakerphoneModal, setShowSpeakerphoneModal] = useState(false);
+  const [isSpeakerBannerDismissed, setIsSpeakerBannerDismissed] = useState(false);
+
   // Transcript state
   const [transcript, setTranscript] = useState<TranscriptTurn[]>([]);
   const [interimUserText, setInterimUserText] = useState('');
@@ -85,7 +106,6 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
       startRingingTone();
     }
 
-    // Connect call after 2.2 seconds of ringing
     connectTimeout = window.setTimeout(() => {
       stopRingingTone();
       if (audioSettings.soundEffects) {
@@ -176,6 +196,19 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
     }
   };
 
+  // Manual Turn Switch
+  const handleManualSwitchTurn = () => {
+    const nextTurn = currentTurn === 'user' ? 'contact' : 'user';
+    setCurrentTurn(nextTurn);
+    if (nextTurn === 'contact') {
+      speechRecognitionRef.current?.stop();
+      setStatusNotice(`Tour passé à ${contactName}. Vous pouvez écouter ou déclencher sa réponse.`);
+    } else {
+      speechRecognitionRef.current?.start(userLangObj.bcp47);
+      setStatusNotice('C\'est à votre tour de parler.');
+    }
+  };
+
   // Process a spoken or typed utterance
   const handleProcessSpokenUtterance = async (
     text: string,
@@ -217,22 +250,59 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
 
       setTranscript((prev) => [...prev, newTurn]);
 
-      // If speaker is user, play translated speech aloud in contact's language
-      if (speaker === 'user' && audioSettings.autoSpeak && isSpeakerOn) {
-        speakTranslatedText(translationResult.translatedText, contactLangObj.bcp47, {
-          rate: audioSettings.speechRate,
-          pitch: audioSettings.speechPitch,
-          volume: audioSettings.speechVolume,
-        });
-      }
-
-      // If speaker is contact, play translation aloud in user's language
-      if (speaker === 'contact' && audioSettings.autoSpeak && isSpeakerOn) {
-        speakTranslatedText(translationResult.translatedText, userLangObj.bcp47, {
-          rate: audioSettings.speechRate,
-          pitch: audioSettings.speechPitch,
-          volume: audioSettings.speechVolume,
-        });
+      // Handle speech output and turn switching
+      if (speaker === 'user') {
+        if (audioSettings.autoSpeak && isSpeakerOn) {
+          speakTranslatedText(translationResult.translatedText, contactLangObj.bcp47, {
+            rate: audioSettings.speechRate,
+            pitch: audioSettings.speechPitch,
+            volume: audioSettings.speechVolume,
+            onEnd: () => {
+              // Automatic turn switch to contact
+              if (autoSwitchTurn) {
+                setCurrentTurn('contact');
+                setStatusNotice(`Bascule automatique : au tour de ${contactName} de répondre...`);
+                // Auto simulate contact reply after 1.2s for natural telephony pacing
+                setTimeout(() => {
+                  handleSimulateContactReply();
+                }, 1200);
+              }
+            },
+          });
+        } else if (autoSwitchTurn) {
+          // If autoSpeak is disabled, switch after 1s
+          setTimeout(() => {
+            setCurrentTurn('contact');
+            setStatusNotice(`Bascule automatique : au tour de ${contactName} de répondre...`);
+            setTimeout(() => {
+              handleSimulateContactReply();
+            }, 1000);
+          }, 800);
+        }
+      } else {
+        // Speaker is contact
+        if (audioSettings.autoSpeak && isSpeakerOn) {
+          speakTranslatedText(translationResult.translatedText, userLangObj.bcp47, {
+            rate: audioSettings.speechRate,
+            pitch: audioSettings.speechPitch,
+            volume: audioSettings.speechVolume,
+            onEnd: () => {
+              setIsContactSpeaking(false);
+              if (autoSwitchTurn) {
+                setCurrentTurn('user');
+                setStatusNotice('C\'est à votre tour de parler 🎙️');
+                speechRecognitionRef.current?.start(userLangObj.bcp47);
+              }
+            },
+          });
+        } else {
+          setIsContactSpeaking(false);
+          if (autoSwitchTurn) {
+            setCurrentTurn('user');
+            setStatusNotice('C\'est à votre tour de parler 🎙️');
+            speechRecognitionRef.current?.start(userLangObj.bcp47);
+          }
+        }
       }
     } catch (err: unknown) {
       console.error('Translation error:', err);
@@ -251,12 +321,12 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
     handleProcessSpokenUtterance(text, 'user');
   };
 
-  // Simulate contact reply via Gemini AI
+  // Simulate contact reply via Gemini AI / Persona engine
   const handleSimulateContactReply = async () => {
     if (isSimulatingContact) return;
     setIsSimulatingContact(true);
     setIsContactSpeaking(true);
-    setStatusNotice('Le correspondant formule sa réponse...');
+    setStatusNotice(`${contactName} formule sa réponse en direct...`);
 
     const lastUserTurn = [...transcript].reverse().find((t) => t.speaker === 'user');
     const userUtterance = lastUserTurn?.originalText || 'Bonjour';
@@ -289,16 +359,28 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
 
       setTranscript((prev) => [...prev, newTurn]);
 
-      // Speak in French for user
+      // Speak in French for user on speakerphone
       if (isSpeakerOn && audioSettings.autoSpeak) {
         speakTranslatedText(response.translatedToUserLanguage, userLangObj.bcp47, {
           rate: audioSettings.speechRate,
           pitch: audioSettings.speechPitch,
           volume: audioSettings.speechVolume,
-          onEnd: () => setIsContactSpeaking(false),
+          onEnd: () => {
+            setIsContactSpeaking(false);
+            if (autoSwitchTurn) {
+              setCurrentTurn('user');
+              setStatusNotice('C\'est à votre tour de parler 🎙️');
+              speechRecognitionRef.current?.start(userLangObj.bcp47);
+            }
+          },
         });
       } else {
         setIsContactSpeaking(false);
+        if (autoSwitchTurn) {
+          setCurrentTurn('user');
+          setStatusNotice('C\'est à votre tour de parler 🎙️');
+          speechRecognitionRef.current?.start(userLangObj.bcp47);
+        }
       }
 
       setStatusNotice(null);
@@ -311,14 +393,34 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
     }
   };
 
-  // Replay a turn's speech
-  const handleReplayTurn = (turn: TranscriptTurn) => {
-    const isContact = turn.speaker === 'contact';
-    const lang = isContact ? userLangObj.bcp47 : contactLangObj.bcp47;
-    speakTranslatedText(turn.translatedText, lang, {
+  // Replay speech for any sentence (Original VO or Translated VF)
+  const handleReplaySpeech = (turn: TranscriptTurn, type: 'original' | 'translated') => {
+    // If currently playing this exact turn and type, stop it
+    if (playingState?.turnId === turn.id && playingState?.type === type) {
+      stopSpeaking();
+      setPlayingState(null);
+      return;
+    }
+
+    stopSpeaking();
+    setPlayingState({ turnId: turn.id, type });
+
+    let textToSpeak = '';
+    let langCode = '';
+
+    if (type === 'original') {
+      textToSpeak = turn.originalText;
+      langCode = turn.speaker === 'user' ? userLangObj.bcp47 : contactLangObj.bcp47;
+    } else {
+      textToSpeak = turn.translatedText;
+      langCode = turn.speaker === 'user' ? contactLangObj.bcp47 : userLangObj.bcp47;
+    }
+
+    speakTranslatedText(textToSpeak, langCode, {
       rate: audioSettings.speechRate,
       pitch: audioSettings.speechPitch,
       volume: audioSettings.speechVolume,
+      onEnd: () => setPlayingState(null),
     });
   };
 
@@ -338,7 +440,6 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
       playCallEndedTone();
     }
 
-    // Stop audio recorder and get recording URL
     let audioUrl: string | undefined = undefined;
     let hasAudio = false;
 
@@ -354,11 +455,10 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
       }
     }
 
-    // Generate executive summary with Gemini if there is a transcript
     let summaryData = undefined;
     if (transcript.length > 0) {
       try {
-        setStatusNotice('Génération du résumé de l\'appel par IA...');
+        setStatusNotice('Génération de la synthèse intelligente d\'appel...');
         summaryData = await generateCallSummary(
           transcript,
           contactName,
@@ -390,8 +490,8 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
         {
           id: 'turn-empty',
           speaker: 'user',
-          originalText: 'Appel écourté.',
-          translatedText: 'Call ended promptly.',
+          originalText: 'Appel terminé.',
+          translatedText: 'Call completed.',
           sourceLang: userLang,
           targetLang: contactLang,
           timestamp: '00:01',
@@ -411,7 +511,7 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] max-w-5xl mx-auto px-2 sm:px-4 py-3">
       {/* Telephony Heads-Up Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg mb-3 shrink-0">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg mb-2.5 shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Contact Identity */}
           <div className="flex items-center gap-3">
@@ -434,73 +534,140 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
             </div>
           </div>
 
-          {/* Call Status & Timer */}
-          <div className="flex items-center gap-4">
+          {/* Turn Indicator & Call Status */}
+          <div className="flex items-center flex-wrap gap-2.5">
+            {/* Active Speaker Turn Badge */}
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-sm transition-all ${
+                currentTurn === 'user'
+                  ? 'bg-blue-950/80 border-blue-700/80 text-blue-200'
+                  : 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200'
+              }`}
+            >
+              <span
+                className={`w-2.5 h-2.5 rounded-full ${
+                  currentTurn === 'user' ? 'bg-blue-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
+                }`}
+              />
+              <span>
+                {currentTurn === 'user'
+                  ? `À vous de parler (${userLangObj.name})`
+                  : `À l'interlocuteur (${contactLangObj.name})`}
+              </span>
+            </div>
+
+            {/* Manual Switch Button */}
+            <button
+              onClick={handleManualSwitchTurn}
+              title="Changer manuellement le tour de parole"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium transition-colors"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Passer le tour</span>
+            </button>
+
+            {/* Duration */}
             {callStatus === 'ringing' ? (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-950/70 border border-amber-800/80 text-amber-300 text-xs font-semibold animate-pulse">
                 <Radio className="w-4 h-4 animate-spin" />
-                <span>Composition & Appel en cours...</span>
+                <span>Composition en cours...</span>
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                {/* Duration */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
-                  <span className="text-xs text-slate-400 font-medium">Durée</span>
-                  <span className="text-base font-mono font-bold text-white tabular-nums">
-                    {formatTimer(durationSeconds)}
-                  </span>
-                </div>
-
-                {/* REC indicator */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800">
+                <span className="text-xs text-slate-400 font-medium">Durée</span>
+                <span className="text-sm font-mono font-bold text-white tabular-nums">
+                  {formatTimer(durationSeconds)}
+                </span>
                 {isRecording && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-red-950/60 border border-red-800/60 text-red-400 text-xs font-mono font-semibold">
-                    <Disc className="w-3.5 h-3.5 animate-spin" />
+                  <span className="flex items-center gap-1 text-[10px] text-red-400 font-mono ml-1">
+                    <Disc className="w-3 h-3 animate-spin" />
                     <span>REC</span>
-                  </div>
+                  </span>
                 )}
               </div>
             )}
           </div>
         </div>
 
-        {/* Audio Visualizer Spectrum Strip */}
-        <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+        {/* Audio Visualizer & Channel Bar */}
+        <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+          <div className="flex items-center gap-3 text-xs text-slate-400">
             <span className="font-semibold text-slate-200">Canal bilingue :</span>
             <span>{userLangObj.name} {userLangObj.flag}</span>
             <span>⇄</span>
             <span>{contactLangObj.name} {contactLangObj.flag}</span>
+            <span className="hidden md:inline">·</span>
+            <button
+              onClick={() => setAutoSwitchTurn(!autoSwitchTurn)}
+              className={`hidden md:flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium border ${
+                autoSwitchTurn
+                  ? 'bg-blue-950/60 border-blue-800 text-blue-300'
+                  : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}
+            >
+              <span>Bascule auto : {autoSwitchTurn ? 'Active' : 'Manuelle'}</span>
+            </button>
           </div>
 
-          {/* Waveform */}
-          <div className="w-full sm:w-64">
+          <div className="w-full sm:w-60">
             <AudioVisualizer
               isActive={isUserSpeaking || isContactSpeaking || callStatus === 'ringing'}
               color={isUserSpeaking ? '#3b82f6' : isContactSpeaking ? '#10b981' : '#f59e0b'}
-              height={26}
+              height={24}
               barsCount={24}
             />
           </div>
         </div>
       </div>
 
+      {/* Prominent Speakerphone Guideline Banner */}
+      {!isSpeakerBannerDismissed && (
+        <div className="bg-amber-950/50 border border-amber-800/70 rounded-xl px-4 py-2.5 mb-2.5 flex items-center justify-between gap-3 text-xs text-amber-200 shadow-sm shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-amber-900/70 text-amber-300 flex items-center justify-center shrink-0">
+              <Volume2 className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-amber-100">Consigne Haut-Parleur Téléphone :</span>
+              <span className="text-amber-200/90 ml-1">
+                Activez le haut-parleur de votre appel pour que le micro traduise les deux voix sans coupure.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowSpeakerphoneModal(true)}
+              className="px-2.5 py-1 bg-amber-900/80 hover:bg-amber-800 border border-amber-700 text-white font-medium rounded-lg transition-colors whitespace-nowrap text-[11px]"
+            >
+              Consigne détaillée ➔
+            </button>
+            <button
+              onClick={() => setIsSpeakerBannerDismissed(true)}
+              className="text-amber-400 hover:text-white text-base px-1 leading-none"
+              title="Masquer le rappel"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Conversation Transcript Area */}
-      <div className="flex-1 overflow-y-auto bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-3 shadow-inner space-y-4">
+      <div className="flex-1 overflow-y-auto bg-slate-950/90 border border-slate-800 rounded-2xl p-4 sm:p-5 mb-2.5 shadow-inner space-y-3.5">
         {transcript.length === 0 && !interimUserText && (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-400">
             <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-3 text-blue-400">
               <Mic className="w-7 h-7" />
             </div>
             <h3 className="text-base font-semibold text-white mb-1">
-              Traduction simultanée prête
+              Traduction vocale en temps réel prête
             </h3>
-            <p className="text-xs text-slate-400 max-w-md mb-4">
-              Parlez naturellement dans votre microphone. Vos paroles seront
-              transcrites, traduites en {contactLangObj.name} et prononcées en direct.
+            <p className="text-xs text-slate-400 max-w-md mb-4 leading-relaxed">
+              Parlez dans votre micro. La phrase sera traduite, prononcée à haute voix, puis VoxCall basculera automatiquement l'écoute vers votre correspondant.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-lg">
               <span className="text-[11px] text-slate-400 w-full mb-1">
-                Suggestions pour commencer l'appel :
+                Phrases suggérées pour commencer :
               </span>
               {userLangObj.samplePhrases.slice(0, 3).map((phrase) => (
                 <button
@@ -515,9 +682,11 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
           </div>
         )}
 
-        {/* Turn-by-turn items */}
+        {/* Turn items with Dual Replay Buttons */}
         {transcript.map((turn) => {
           const isUser = turn.speaker === 'user';
+          const isPlayingOriginal = playingState?.turnId === turn.id && playingState?.type === 'original';
+          const isPlayingTranslated = playingState?.turnId === turn.id && playingState?.type === 'translated';
 
           return (
             <div
@@ -547,29 +716,67 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
                     : 'bg-slate-900 border-slate-800 text-slate-100 rounded-tl-none'
                 }`}
               >
-                {/* Spoken original */}
-                <div className="text-sm font-medium leading-relaxed mb-2">
-                  {turn.originalText}
+                {/* Spoken original with VO Replay button */}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="text-sm font-medium leading-relaxed">
+                    {turn.originalText}
+                  </div>
+                  <button
+                    onClick={() => handleReplaySpeech(turn, 'original')}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all shrink-0 ${
+                      isPlayingOriginal
+                        ? 'bg-amber-600 text-white animate-pulse'
+                        : 'bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white'
+                    }`}
+                    title="Réécouter la voix originale (VO)"
+                  >
+                    {isPlayingOriginal ? (
+                      <>
+                        <Square className="w-3 h-3 fill-current" />
+                        <span>Stop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3 h-3" />
+                        <span>Réécouter VO</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
-                {/* Translation block */}
-                <div className="pt-2 border-t border-white/10 flex flex-col gap-1">
+                {/* Translation block with Translated Replay button */}
+                <div className="pt-2.5 border-t border-white/10 flex flex-col gap-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] uppercase tracking-wider font-semibold text-blue-300/90 flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-amber-400" />
-                      <span>
-                        Traduction ({isUser ? contactLangObj.name : userLangObj.name})
-                      </span>
+                      <span>Traduction ({isUser ? contactLangObj.name : userLangObj.name})</span>
                     </span>
 
                     <div className="flex items-center gap-1.5">
+                      {/* Replay Translated Voice Button */}
                       <button
-                        onClick={() => handleReplayTurn(turn)}
+                        onClick={() => handleReplaySpeech(turn, 'translated')}
+                        className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                          isPlayingTranslated
+                            ? 'bg-emerald-600 text-white animate-pulse'
+                            : 'bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white'
+                        }`}
                         title="Réécouter la voix traduite"
-                        className="p-1 rounded hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
                       >
-                        <Volume2 className="w-3.5 h-3.5" />
+                        {isPlayingTranslated ? (
+                          <>
+                            <Square className="w-3 h-3 fill-current" />
+                            <span>Stop</span>
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Réécouter Traduction</span>
+                          </>
+                        )}
                       </button>
+
+                      {/* Copy Translation */}
                       <button
                         onClick={() => copyTranscriptText(turn.id, turn.translatedText)}
                         title="Copier la traduction"
@@ -636,10 +843,10 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
         </div>
       )}
 
-      {/* In-Call Controls & Input Deck */}
+      {/* In-Call Controls Deck */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-lg shrink-0">
         {/* Quick Response Preset Buttons */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none text-xs">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2.5 scrollbar-none text-xs">
           <span className="text-slate-400 font-medium whitespace-nowrap shrink-0">
             Phrases rapides :
           </span>
@@ -654,8 +861,8 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
           ))}
         </div>
 
-        {/* Text Input Row (for noisy environments or manual typing) */}
-        <form onSubmit={handleSendManualText} className="flex items-center gap-2 mb-3">
+        {/* Text Input Row */}
+        <form onSubmit={handleSendManualText} className="flex items-center gap-2 mb-2.5">
           <input
             type="text"
             value={manualInputText}
@@ -701,19 +908,43 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
             >
               {isSpeakerOn ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
             </button>
+
+            {/* Auto Switch Turn Toggle */}
+            <button
+              onClick={() => setAutoSwitchTurn(!autoSwitchTurn)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                autoSwitchTurn
+                  ? 'bg-blue-950/70 border-blue-700/80 text-blue-200'
+                  : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+              }`}
+              title="Bascule automatique du tour de parole après chaque traduction"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-blue-400" />
+              <span>Bascule auto : {autoSwitchTurn ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {/* Speakerphone Guide Button */}
+            <button
+              onClick={() => setShowSpeakerphoneModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 border border-amber-800/80 transition-colors"
+              title="Ouvrir les consignes pour le haut-parleur"
+            >
+              <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Consigne Haut-Parleur</span>
+            </button>
           </div>
 
-          {/* AI Remote Caller Simulation Button */}
+          {/* AI Remote Caller Simulation Button & Hangup */}
           <div className="flex items-center gap-2">
             <button
               onClick={handleSimulateContactReply}
               disabled={isSimulatingContact}
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-purple-950/80 hover:bg-purple-900/80 text-purple-200 border border-purple-800/80 transition-all disabled:opacity-50"
-              title="Faire répondre le correspondant par IA dans sa langue maternelle"
+              title="Faire répondre le correspondant dans sa langue maternelle"
             >
               <Bot className="w-4 h-4 text-purple-400" />
               <span>
-                {isSimulatingContact ? 'Réponse...' : 'Réponse Correspondant (IA)'}
+                {isSimulatingContact ? 'Réponse...' : 'Réponse Correspondant'}
               </span>
             </button>
 
@@ -723,11 +954,19 @@ export const ActiveCallScreen: React.FC<ActiveCallScreenProps> = ({
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-500 text-white shadow-md shadow-red-950/40 transition-all"
             >
               <PhoneOff className="w-4 h-4" />
-              <span>Raccrocher & Enregistrer</span>
+              <span>Raccrocher</span>
             </button>
           </div>
         </div>
       </div>
+
+      {/* Speakerphone Guide Modal */}
+      {showSpeakerphoneModal && (
+        <SpeakerphoneGuide
+          isOpen={showSpeakerphoneModal}
+          onClose={() => setShowSpeakerphoneModal(false)}
+        />
+      )}
     </div>
   );
 };

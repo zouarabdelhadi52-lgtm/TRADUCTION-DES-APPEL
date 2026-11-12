@@ -29,6 +29,31 @@ export default defineConfig(() => {
               url: '/?call=%s',
             },
           ],
+          categories: ['utilities', 'productivity', 'communication'],
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
+          shortcuts: [
+            {
+              name: 'Nouvel Appel Traduit',
+              short_name: 'Appel',
+              description: 'Lancer un appel avec traduction vocale instantanée',
+              url: '/?tab=call',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Interphone Bilingue',
+              short_name: 'Interphone',
+              description: 'Traduction orale alternée en face-à-face',
+              url: '/?tab=intercom',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+            {
+              name: 'Historique des Appels',
+              short_name: 'Historique',
+              description: 'Consulter et réécouter vos enregistrements',
+              url: '/?tab=history',
+              icons: [{ src: '/pwa-192x192.png', sizes: '192x192' }],
+            },
+          ],
           icons: [
             {
               src: '/pwa-192x192.png',
